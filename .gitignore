@@ -1,0 +1,6 @@
+docs/
+q1_library_lending/library_tracker
+q1_library_lending/*.dat
+q1_library_lending/*.tmp
+q1_library_lending/keys/
+*.o
