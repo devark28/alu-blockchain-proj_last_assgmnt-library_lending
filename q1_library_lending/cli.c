@@ -23,15 +23,32 @@ typedef struct {
 } Command;
 
 static const Command COMMANDS[] = {
+    {"Membership", "register_member", "<member_id> \"<full_name>\" <course_code>", 3, 3, command_register_member,
+     "add a member and put their public key on the chain"},
     {"Membership", "view_member", "[member_id]", 0, 1, command_view_member, "list members, or show one member"},
+    {"Membership", "member_nonce", "<member_id>", 1, 1, command_member_nonce, "show the nonce a member signs with"},
     {"Books and copies", "register_book", "<book_id> \"<title>\" \"<author>\"", 3, 3, command_register_book,
      "add a title to books.txt"},
     {"Books and copies", "view_book", "[book_id]", 0, 1, command_view_book, "list books, or show one book and its copies"},
     {"Books and copies", "add_copy", "<book_id> <NEW|GOOD|WORN>", 2, 2, command_add_copy,
      "add a physical copy to copies.txt"},
     {"Books and copies", "view_copy", "<copy_id>", 1, 1, command_view_copy, "show one copy's state"},
-    {"Blockchain", "chain_view", "[index]", 0, 1, command_chain_view, "list blocks, or show one block in full"},
-    {"Blockchain", "validate_chain", "", 0, 0, command_validate_chain, "check every block and record"},
+    {"Books and copies", "mark_lost", "<copy_id> <reason_code>", 2, 2, command_mark_lost,
+     "librarian override: the copy is lost"},
+    {"Lending", "borrow_book", "<book_id> <member_id>", 2, 2, command_borrow_book, "borrow an available copy"},
+    {"Lending", "return_book", "<copy_id> <NEW|GOOD|WORN> [reason_code]", 2, 3, command_return_book,
+     "return a copy and record its condition"},
+    {"Lending", "renew_book", "<copy_id>", 1, 1, command_renew_book, "extend the due date"},
+    {"Lending", "reserve_book", "<book_id> <member_id>", 2, 2, command_reserve_book,
+     "join the queue for a title with no copy available"},
+    {"Lending", "reservation_status", "[book_id]", 0, 1, command_reservation_status,
+     "show reservation queues and held copies"},
+    {"Fines and overdue", "check_overdue", "", 0, 0, command_check_overdue, "record overdue loans and list them"},
+    {"Fines and overdue", "view_fines", "[member_id]", 0, 1, command_view_fines, "fines owed and still accruing"},
+    {"Blockchain and mining", "pool_view", "", 0, 0, command_pool_view, "pending requests in mining order"},
+    {"Blockchain and mining", "mine_solo", "<miner_id>", 1, 1, command_mine_solo, "mine every pending request"},
+    {"Blockchain and mining", "chain_view", "[index]", 0, 1, command_chain_view, "list blocks, or show one block in full"},
+    {"Blockchain and mining", "validate_chain", "", 0, 0, command_validate_chain, "check every block and record"},
     {"Keys", "logout", "", 0, 0, command_logout, "lock every unlocked private key"},
 };
 
@@ -63,11 +80,11 @@ static void print_help(void)
         }
         char signature[96];
         snprintf(signature, sizeof(signature), "%s %s", command->name, command->arguments);
-        printf("  %-48s %s\n", signature, command->summary);
+        printf("  %-52s %s\n", signature, command->summary);
     }
     printf("\nShell\n");
-    printf("  %-48s %s\n", "help", "show this list");
-    printf("  %-48s %s\n", "exit", "leave the shell");
+    printf("  %-52s %s\n", "help", "show this list");
+    printf("  %-52s %s\n", "exit", "leave the shell");
     printf("\nWrap values that contain spaces in double quotes.\n");
 }
 
@@ -132,6 +149,9 @@ bool execute_command(LibrarySystem *library, int arg_count, char *args[])
     if (given < command->min_args || given > command->max_args) {
         print_usage(command);
         return false;
+    }
+    if (command->run != command_check_overdue) {
+        scan_for_overdue_loans(library);
     }
     return command->run(library, given, args + 1);
 }

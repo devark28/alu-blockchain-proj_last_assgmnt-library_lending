@@ -3,7 +3,8 @@
 
 #include "blockchain.h"
 #include "keyring.h"
-#include "registry.h"
+#include "pool.h"
+#include "state.h"
 
 #include <stdbool.h>
 
@@ -11,23 +12,31 @@
 #define MEMBERS_FILE "members.txt"
 #define COPIES_FILE "copies.txt"
 #define CHAIN_FILE "chain.dat"
+#define POOL_FILE "pool.dat"
 
 /*
- * Everything the program holds in memory. identities is rebuilt from the
- * chain on every start, and chain_is_valid stays false after a failed
- * validation so that only read-only commands can run.
+ * Everything the program holds in memory. state is rebuilt from the chain
+ * on every start. chain_is_valid stays false after a failed validation, so
+ * that only read-only commands can run.
  */
 typedef struct {
-    Registry registry;
+    LibraryState state;
     BlockList chain;
-    Keyring identities;
+    Pool pool;
+    KeyStore keys;
     int difficulty;
     bool chain_is_valid;
 } LibrarySystem;
 
 bool library_open(LibrarySystem *library);
 void library_close(LibrarySystem *library);
+
 bool require_writable_chain(const LibrarySystem *library);
-bool require_librarian(LibrarySystem *library);
+EVP_PKEY *unlock_librarian(LibrarySystem *library);
+EVP_PKEY *unlock_member(LibrarySystem *library, const char *member_id);
+
+LibraryState *build_effective_state(const LibrarySystem *library);
+bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_key);
+void prune_pool(LibrarySystem *library);
 
 #endif

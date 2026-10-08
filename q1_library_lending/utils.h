@@ -6,6 +6,7 @@
 #include <time.h>
 
 #define TIME_TEXT_SIZE 20
+#define MAX_TIME_VALUE 32503680000LL
 
 int split_line(char *line, char delimiter, char *fields[], int max_fields);
 bool copy_field(char *dest, size_t dest_size, const char *src);

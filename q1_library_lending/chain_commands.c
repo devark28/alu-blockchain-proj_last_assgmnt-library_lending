@@ -38,7 +38,7 @@ bool command_logout(LibrarySystem *library, int arg_count, char *args[])
 {
     (void)arg_count;
     (void)args;
-    int locked = lock_all_identities(&library->identities);
+    int locked = lock_all_keys(&library->keys);
     if (locked == 0) {
         printf("No keys were unlocked.\n");
     } else {

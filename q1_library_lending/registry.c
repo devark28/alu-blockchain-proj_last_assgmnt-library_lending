@@ -114,7 +114,7 @@ static bool split_record(char *line, char *fields[FIELDS_PER_LINE])
 
 static bool add_book_line(Registry *registry, char *fields[FIELDS_PER_LINE], const char *path, int line_number)
 {
-    Book book;
+    Book book = {0};
     if (!is_valid_book_id(fields[0])
         || !copy_field(book.book_id, sizeof(book.book_id), fields[0])
         || !copy_field(book.title, sizeof(book.title), fields[1])
@@ -133,7 +133,7 @@ static bool add_book_line(Registry *registry, char *fields[FIELDS_PER_LINE], con
 
 static bool add_member_line(Registry *registry, char *fields[FIELDS_PER_LINE], const char *path, int line_number)
 {
-    Member member;
+    Member member = {0};
     if (!is_valid_member_id(fields[0])
         || !copy_field(member.member_id, sizeof(member.member_id), fields[0])
         || !copy_field(member.full_name, sizeof(member.full_name), fields[1])
@@ -244,21 +244,21 @@ const Book *find_book(const Registry *registry, const char *book_id)
     return NULL;
 }
 
-const Member *find_member(const Registry *registry, const char *member_id)
+Member *find_member(const Registry *registry, const char *member_id)
 {
     for (int i = 0; i < registry->member_count; i++) {
         if (strcmp(registry->members[i].member_id, member_id) == 0) {
-            return &registry->members[i];
+            return (Member *)&registry->members[i];
         }
     }
     return NULL;
 }
 
-Copy *find_copy(Registry *registry, const char *copy_id)
+Copy *find_copy(const Registry *registry, const char *copy_id)
 {
     for (int i = 0; i < registry->copy_count; i++) {
         if (strcmp(registry->copies[i].copy_id, copy_id) == 0) {
-            return &registry->copies[i];
+            return (Copy *)&registry->copies[i];
         }
     }
     return NULL;

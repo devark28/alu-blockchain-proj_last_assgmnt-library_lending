@@ -34,15 +34,18 @@ typedef struct {
     char author[AUTHOR_SIZE];
 } Book;
 
+/* fines_owed is not in members.txt; it is worked out from the chain. */
 typedef struct {
     char member_id[ID_SIZE];
     char full_name[NAME_SIZE];
     char course_code[COURSE_SIZE];
+    int fines_owed;
 } Member;
 
 /*
  * copies.txt only provides copy_id, book_id and the starting condition.
- * The other fields describe the copy's current lending state.
+ * The other fields describe the copy's current lending state. reserved_at
+ * is when the member it is held for joined the reservation queue.
  */
 typedef struct {
     char copy_id[ID_SIZE];
@@ -52,6 +55,8 @@ typedef struct {
     char current_holder_id[ID_SIZE];
     time_t due_date;
     int renewal_count;
+    bool overdue_recorded;
+    time_t reserved_at;
 } Copy;
 
 typedef struct {
@@ -66,8 +71,9 @@ typedef struct {
 bool load_registry(Registry *registry, const char *books_path, const char *members_path, const char *copies_path);
 
 const Book *find_book(const Registry *registry, const char *book_id);
-const Member *find_member(const Registry *registry, const char *member_id);
-Copy *find_copy(Registry *registry, const char *copy_id);
+/* Like strchr, these accept a const registry but return an element the caller may update. */
+Member *find_member(const Registry *registry, const char *member_id);
+Copy *find_copy(const Registry *registry, const char *copy_id);
 int count_copies(const Registry *registry, const char *book_id);
 
 bool is_valid_book_id(const char *id);

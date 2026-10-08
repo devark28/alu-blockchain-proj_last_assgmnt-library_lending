@@ -13,7 +13,6 @@
 #define HEADER_SIZE 640
 #define PAYOUTS_TEXT_SIZE 200
 #define FILE_LINE_SIZE 1100
-#define PROBLEM_SIZE 160
 #define ZERO_HASH "0000000000000000000000000000000000000000000000000000000000000000"
 
 bool block_list_append(BlockList *list, const Block *block)
@@ -43,6 +42,23 @@ void block_list_free(BlockList *list)
 const Block *last_block(const BlockList *chain)
 {
     return chain->count > 0 ? &chain->blocks[chain->count - 1] : NULL;
+}
+
+/* Searches from the newest block backwards for the last record of action on copy_id. */
+const Record *find_latest_copy_record(const BlockList *chain, const char *copy_id, RecordAction action,
+                                      int *block_index)
+{
+    for (int b = chain->count - 1; b >= 0; b--) {
+        const Block *block = &chain->blocks[b];
+        for (int r = block->record_count - 1; r >= 0; r--) {
+            const Record *record = &block->records[r];
+            if (record->action == action && strcmp(record->copy_id, copy_id) == 0) {
+                *block_index = b;
+                return record;
+            }
+        }
+    }
+    return NULL;
 }
 
 bool compute_block_merkle_root(const Block *block, char root[HASH_HEX_SIZE])

@@ -10,6 +10,7 @@
 #define CONDITION_TEXT_SIZE 8
 #define REASON_SIZE 24
 #define RECORD_LINE_SIZE 1024
+#define PROBLEM_SIZE 160
 
 typedef enum {
     ACTION_BORROWED,

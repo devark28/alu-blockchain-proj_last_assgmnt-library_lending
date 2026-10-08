@@ -24,8 +24,9 @@ bool transition_is_allowed(CopyState from, CopyState to)
 }
 
 /*
- * Every state change goes through here. The caller sets the holder and due
- * date for BORROWED and RESERVED; leaving a loan clears them.
+ * Every state change goes through here. Any state other than BORROWED ends
+ * the loan, so its details are cleared; the caller then sets the holder for
+ * BORROWED and RESERVED.
  */
 bool change_copy_state(Copy *copy, CopyState new_state)
 {
@@ -36,10 +37,12 @@ bool change_copy_state(Copy *copy, CopyState new_state)
     }
 
     copy->state = new_state;
-    if (new_state == COPY_AVAILABLE || new_state == COPY_LOST) {
+    if (new_state != COPY_BORROWED) {
         copy->current_holder_id[0] = '\0';
         copy->due_date = 0;
         copy->renewal_count = 0;
+        copy->overdue_recorded = false;
+        copy->reserved_at = 0;
     }
     if (new_state == COPY_LOST) {
         copy->condition = CONDITION_LOST;

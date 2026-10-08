@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const Book *require_book(const Registry *registry, const char *book_id)
+const Book *require_book(const Registry *registry, const char *book_id)
 {
     if (!is_valid_book_id(book_id)) {
         printf("ERROR: %s is not a valid book ID (expected BK followed by 3 to 6 digits)\n", book_id);
@@ -18,7 +18,7 @@ static const Book *require_book(const Registry *registry, const char *book_id)
     return book;
 }
 
-static const Member *require_member(const Registry *registry, const char *member_id)
+const Member *require_member(const Registry *registry, const char *member_id)
 {
     if (!is_valid_member_id(member_id)) {
         printf("ERROR: %s is not a valid member ID (expected ALU followed by 3 to 6 digits)\n", member_id);
@@ -40,7 +40,7 @@ static void print_member_row(const Member *member)
 
 bool command_view_member(LibrarySystem *library, int arg_count, char *args[])
 {
-    const Registry *registry = &library->registry;
+    const Registry *registry = &library->state.registry;
 
     if (arg_count == 0) {
         printf("Members (%d)\n", registry->member_count);
@@ -55,10 +55,27 @@ bool command_view_member(LibrarySystem *library, int arg_count, char *args[])
         return false;
     }
     printf("Member %s\n", member->member_id);
-    printf("  name:   %s\n", member->full_name);
-    printf("  course: %s\n", member->course_code);
-    printf("  copies held:\n");
+    printf("  name:       %s\n", member->full_name);
+    printf("  course:     %s\n", member->course_code);
 
+    const Identity *identity = find_identity(&library->state.identities, member->member_id);
+    if (identity != NULL) {
+        printf("  identity:   public key on the chain, next nonce %d\n", identity->next_nonce);
+    } else {
+        printf("  identity:   no key on the chain yet (created on first use)\n");
+    }
+    printf("  fines owed: %d\n", member->fines_owed);
+
+    const ReservationList *reservations = &library->state.reservations;
+    for (int i = 0; i < reservations->count; i++) {
+        int position = queue_position(reservations, reservations->queues[i].book_id, member->member_id);
+        if (position > 0) {
+            printf("  reserved:   %s, position %d of %d\n", reservations->queues[i].book_id, position,
+                   reservations->queues[i].length);
+        }
+    }
+
+    printf("  copies held:\n");
     bool holds_any = false;
     for (int i = 0; i < registry->copy_count; i++) {
         const Copy *copy = &registry->copies[i];
@@ -79,8 +96,8 @@ bool command_view_member(LibrarySystem *library, int arg_count, char *args[])
 bool command_register_book(LibrarySystem *library, int arg_count, char *args[])
 {
     (void)arg_count;
-    Registry *registry = &library->registry;
-    Book book;
+    Registry *registry = &library->state.registry;
+    Book book = {0};
 
     if (!is_valid_book_id(args[0])) {
         printf("ERROR: %s is not a valid book ID (expected BK followed by 3 to 6 digits)\n", args[0]);
@@ -100,7 +117,7 @@ bool command_register_book(LibrarySystem *library, int arg_count, char *args[])
         printf("ERROR: title is limited to %d characters and author to %d\n", TITLE_SIZE - 1, AUTHOR_SIZE - 1);
         return false;
     }
-    if (!require_librarian(library)) {
+    if (unlock_librarian(library) == NULL) {
         return false;
     }
 
@@ -114,7 +131,7 @@ bool command_register_book(LibrarySystem *library, int arg_count, char *args[])
 
 bool command_view_book(LibrarySystem *library, int arg_count, char *args[])
 {
-    Registry *registry = &library->registry;
+    Registry *registry = &library->state.registry;
 
     if (arg_count == 0) {
         printf("Books (%d)\n", registry->book_count);
@@ -146,7 +163,7 @@ bool command_view_book(LibrarySystem *library, int arg_count, char *args[])
 bool command_add_copy(LibrarySystem *library, int arg_count, char *args[])
 {
     (void)arg_count;
-    Registry *registry = &library->registry;
+    Registry *registry = &library->state.registry;
 
     const Book *book = require_book(registry, args[0]);
     if (book == NULL) {
@@ -157,7 +174,7 @@ bool command_add_copy(LibrarySystem *library, int arg_count, char *args[])
         printf("ERROR: condition must be NEW, GOOD or WORN\n");
         return false;
     }
-    if (!require_librarian(library)) {
+    if (unlock_librarian(library) == NULL) {
         return false;
     }
 
@@ -170,19 +187,26 @@ bool command_add_copy(LibrarySystem *library, int arg_count, char *args[])
     return true;
 }
 
+Copy *require_copy(const Registry *registry, const char *copy_id)
+{
+    if (!is_valid_copy_id(copy_id)) {
+        printf("ERROR: %s is not a valid copy ID (expected a book ID, a dash and a number, such as BK001-2)\n",
+               copy_id);
+        return NULL;
+    }
+    Copy *copy = find_copy(registry, copy_id);
+    if (copy == NULL) {
+        printf("ERROR: Copy not found: %s\n", copy_id);
+    }
+    return copy;
+}
+
 bool command_view_copy(LibrarySystem *library, int arg_count, char *args[])
 {
     (void)arg_count;
-    Registry *registry = &library->registry;
-
-    if (!is_valid_copy_id(args[0])) {
-        printf("ERROR: %s is not a valid copy ID (expected a book ID, a dash and a number, such as BK001-2)\n",
-               args[0]);
-        return false;
-    }
-    const Copy *copy = find_copy(registry, args[0]);
+    Registry *registry = &library->state.registry;
+    const Copy *copy = require_copy(registry, args[0]);
     if (copy == NULL) {
-        printf("ERROR: Copy not found: %s\n", args[0]);
         return false;
     }
 

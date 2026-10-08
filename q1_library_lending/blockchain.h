@@ -58,6 +58,9 @@ bool hash_meets_difficulty(const char *hash, int difficulty);
 void prepare_block(Block *block, const BlockList *chain, int difficulty, const char *sealed_by);
 bool search_nonce(Block *block, unsigned long max_attempts, unsigned long *attempts);
 
+const Record *find_latest_copy_record(const BlockList *chain, const char *copy_id, RecordAction action,
+                                      int *block_index);
+
 bool validate_chain(const BlockList *chain, Keyring *identities, bool print_report);
 
 bool save_chain(const char *path, const BlockList *chain);
