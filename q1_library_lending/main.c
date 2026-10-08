@@ -16,7 +16,7 @@ static void print_usage(const char *program)
 }
 
 /* Reads the options in front of the command and returns where the command starts, or -1 on a bad option. */
-static int parse_options(int argc, char *argv[], LedgerModel *model, int *difficulty)
+static int parse_options(int argc, char *argv[], LibraryOptions *options)
 {
     int index = 1;
     while (index < argc && strncmp(argv[index], "--", 2) == 0) {
@@ -24,16 +24,18 @@ static int parse_options(int argc, char *argv[], LedgerModel *model, int *diffic
             return -1;
         }
         if (strcmp(argv[index], "--model") == 0) {
-            if (!parse_model(argv[index + 1], model)) {
+            if (!parse_model(argv[index + 1], &options->model)) {
                 return -1;
             }
+            options->model_given = true;
         } else if (strcmp(argv[index], "--difficulty") == 0) {
             char *end;
             long value = strtol(argv[index + 1], &end, 10);
             if (*end != '\0' || value < MIN_DIFFICULTY || value > MAX_DIFFICULTY) {
                 return -1;
             }
-            *difficulty = (int)value;
+            options->difficulty = (int)value;
+            options->difficulty_given = true;
         } else {
             return -1;
         }
@@ -49,9 +51,8 @@ static int parse_options(int argc, char *argv[], LedgerModel *model, int *diffic
  */
 int main(int argc, char *argv[])
 {
-    LedgerModel model = MODEL_UTXO;
-    int difficulty = DEFAULT_DIFFICULTY;
-    int command_start = parse_options(argc, argv, &model, &difficulty);
+    LibraryOptions options = {0};
+    int command_start = parse_options(argc, argv, &options);
     if (command_start < 0) {
         print_usage(argv[0]);
         return EXIT_FAILURE;
@@ -59,7 +60,7 @@ int main(int argc, char *argv[])
 
     srand((unsigned int)time(NULL));
     watch_for_interrupt();
-    if (!library_open(&library, model, difficulty)) {
+    if (!library_open(&library, &options)) {
         library_close(&library);
         return EXIT_FAILURE;
     }

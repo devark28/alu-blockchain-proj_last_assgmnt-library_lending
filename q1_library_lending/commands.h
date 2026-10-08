@@ -50,5 +50,11 @@ bool command_mine_pool(LibrarySystem *library, int arg_count, char *args[]);
 bool command_mine_cloud(LibrarySystem *library, int arg_count, char *args[]);
 bool command_difficulty_status(LibrarySystem *library, int arg_count, char *args[]);
 bool command_set_difficulty(LibrarySystem *library, int arg_count, char *args[]);
+bool command_lending_history(LibrarySystem *library, int arg_count, char *args[]);
+bool command_member_history(LibrarySystem *library, int arg_count, char *args[]);
+bool command_book_history(LibrarySystem *library, int arg_count, char *args[]);
+bool command_chain_save(LibrarySystem *library, int arg_count, char *args[]);
+bool command_chain_load(LibrarySystem *library, int arg_count, char *args[]);
+bool command_tamper_demo(LibrarySystem *library, int arg_count, char *args[]);
 
 #endif

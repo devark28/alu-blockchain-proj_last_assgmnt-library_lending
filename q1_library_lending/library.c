@@ -1,5 +1,6 @@
 #include "library.h"
 #include "fraud.h"
+#include "storage.h"
 #include "utils.h"
 
 #include <limits.h>
@@ -107,27 +108,58 @@ static bool load_and_validate_chain(LibrarySystem *library)
     return true;
 }
 
-bool library_open(LibrarySystem *library, LedgerModel model, int difficulty)
+/*
+ * Settings given on the command line win; otherwise the ones meta.dat
+ * recorded at the last save are used, so a restart keeps the same model
+ * and difficulty.
+ */
+static void choose_settings(LibrarySystem *library, const ChainMetadata *metadata)
 {
-    library->difficulty = difficulty;
-    library->state.ledger.model = model;
+    const LibraryOptions *options = &library->options;
+    library->state.ledger.model = options->model_given ? options->model : metadata->model;
+    library->difficulty = options->difficulty_given ? options->difficulty : metadata->difficulty;
+}
+
+/*
+ * Loads the registries, then either loads and checks the saved chain or,
+ * when there is none and allow_new_chain is set, starts one with a genesis
+ * block. A loaded chain is validated, replayed, checked against meta.dat
+ * for missing blocks, and the snapshots are compared with what it rebuilds.
+ */
+static bool load_library(LibrarySystem *library, bool allow_new_chain)
+{
+    ChainMetadata metadata;
+    if (!load_metadata(&metadata)) {
+        return false;
+    }
+    choose_settings(library, &metadata);
 
     if (!load_registry(&library->state.registry, BOOKS_FILE, MEMBERS_FILE, COPIES_FILE)) {
         return false;
     }
     printf("Loaded %d books, %d copies and %d members.\n", library->state.registry.book_count,
            library->state.registry.copy_count, library->state.registry.member_count);
-    printf("Ledger model: %s. Mining difficulty: %d.\n", model_name(model), difficulty);
+    printf("Ledger model: %s. Mining difficulty: %d.\n", model_name(library->state.ledger.model),
+           library->difficulty);
 
-    bool opened;
-    if (access(CHAIN_FILE, F_OK) == 0) {
-        opened = load_and_validate_chain(library);
-    } else {
-        opened = create_genesis_block(library);
-        library->chain_is_valid = opened;
+    if (access(CHAIN_FILE, F_OK) != 0) {
+        if (!allow_new_chain) {
+            printf("ERROR: %s does not exist\n", CHAIN_FILE);
+            return false;
+        }
+        library->chain_is_valid = create_genesis_block(library);
+        return library->chain_is_valid && load_pool(POOL_FILE, &library->pool);
     }
-    if (!opened) {
+
+    if (!load_and_validate_chain(library)) {
         return false;
+    }
+    if (library->chain_is_valid && !check_chain_against_metadata(&library->chain, &metadata)) {
+        library->chain_is_valid = false;
+        printf("Only viewing and validation commands are available until the chain is restored.\n");
+    }
+    if (library->chain_is_valid) {
+        compare_snapshots(&library->state);
     }
 
     if (!load_pool(POOL_FILE, &library->pool)) {
@@ -139,12 +171,46 @@ bool library_open(LibrarySystem *library, LedgerModel model, int difficulty)
     return true;
 }
 
-void library_close(LibrarySystem *library)
+bool library_open(LibrarySystem *library, const LibraryOptions *options)
 {
-    lock_all_keys(&library->keys);
+    library->options = *options;
+    return load_library(library, true);
+}
+
+static void release_library(LibrarySystem *library)
+{
     free_state_contents(&library->state);
     block_list_free(&library->chain);
     pool_free(&library->pool);
+    memset(&library->state, 0, sizeof(library->state));
+}
+
+/* Snapshots are only written from a chain that passed validation, so a damaged chain never overwrites them. */
+bool library_save(const LibrarySystem *library)
+{
+    if (!library->chain_is_valid) {
+        printf("The chain failed validation, so the snapshots were not saved.\n");
+        return false;
+    }
+    return save_chain(CHAIN_FILE, &library->chain) && save_pool(POOL_FILE, &library->pool)
+           && save_snapshots(&library->state, &library->chain, library->difficulty);
+}
+
+/* Throws away everything in memory and loads it again from disk, as a restart would. Unlocked keys stay. */
+bool library_reload(LibrarySystem *library)
+{
+    release_library(library);
+    library->chain_is_valid = false;
+    return load_library(library, false);
+}
+
+void library_close(LibrarySystem *library)
+{
+    if (library->chain_is_valid) {
+        save_snapshots(&library->state, &library->chain, library->difficulty);
+    }
+    lock_all_keys(&library->keys);
+    release_library(library);
 }
 
 bool require_writable_chain(const LibrarySystem *library)

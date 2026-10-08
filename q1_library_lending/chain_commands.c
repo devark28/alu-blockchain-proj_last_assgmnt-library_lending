@@ -1,4 +1,5 @@
 #include "commands.h"
+#include "storage.h"
 #include "utils.h"
 
 #include <limits.h>
@@ -26,11 +27,26 @@ bool command_chain_view(LibrarySystem *library, int arg_count, char *args[])
     return true;
 }
 
+/*
+ * Checks every block, then compares the chain with meta.dat, because a
+ * chain cut short still passes the block checks. A chain that was already
+ * refused at startup (for example for breaking the lending rules) stays
+ * refused until chain_load succeeds.
+ */
 bool command_validate_chain(LibrarySystem *library, int arg_count, char *args[])
 {
     (void)arg_count;
     (void)args;
-    library->chain_is_valid = validate_chain(&library->chain, NULL, true);
+    bool blocks_valid = validate_chain(&library->chain, NULL, true);
+
+    ChainMetadata metadata;
+    bool length_valid = load_metadata(&metadata) && check_chain_against_metadata(&library->chain, &metadata);
+    if (blocks_valid && length_valid) {
+        printf("The chain length matches %s (%d blocks).\n", META_FILE, metadata.found ? metadata.height : 0);
+    }
+    if (!blocks_valid || !length_valid) {
+        library->chain_is_valid = false;
+    }
     return library->chain_is_valid;
 }
 

@@ -15,6 +15,14 @@
 #define POOL_FILE "pool.dat"
 #define AUTOMATIC_NONCE (-1)
 
+/* Settings from the command line; the ones not given come from meta.dat. */
+typedef struct {
+    LedgerModel model;
+    bool model_given;
+    int difficulty;
+    bool difficulty_given;
+} LibraryOptions;
+
 /*
  * Everything the program holds in memory. state is rebuilt from the chain
  * on every start. chain_is_valid stays false after a failed validation, so
@@ -25,11 +33,14 @@ typedef struct {
     BlockList chain;
     Pool pool;
     KeyStore keys;
+    LibraryOptions options;
     int difficulty;
     bool chain_is_valid;
 } LibrarySystem;
 
-bool library_open(LibrarySystem *library, LedgerModel model, int difficulty);
+bool library_open(LibrarySystem *library, const LibraryOptions *options);
+bool library_save(const LibrarySystem *library);
+bool library_reload(LibrarySystem *library);
 void library_close(LibrarySystem *library);
 
 bool require_writable_chain(const LibrarySystem *library);

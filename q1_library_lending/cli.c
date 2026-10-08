@@ -66,6 +66,9 @@ static const Command COMMANDS[] = {
      "the member and 3 peers mine and share rewards"},
     {"Blockchain and mining", "mine_cloud", "<rounds> <member_id>", 2, 2, command_mine_cloud,
      "rent mining power for 1 to 5 rounds"},
+    {"Blockchain and mining", "chain_save", "", 0, 0, command_chain_save, "write the chain and every snapshot to disk"},
+    {"Blockchain and mining", "chain_load", "", 0, 0, command_chain_load,
+     "reload everything from disk and validate it"},
     {"Blockchain and mining", "difficulty_status", "", 0, 0, command_difficulty_status,
      "current difficulty and recent attempt counts"},
     {"Blockchain and mining", "set_difficulty", "<1-4>", 1, 1, command_set_difficulty,
@@ -79,6 +82,13 @@ static const Command COMMANDS[] = {
      "librarian: discard a flagged request"},
     {"Fraud and audit", "replay_request", "<id>", 1, 1, command_replay_request,
      "test: submit a copy of an already signed request"},
+    {"Fraud and audit", "lending_history", "", 0, 0, command_lending_history, "every confirmed lending record"},
+    {"Fraud and audit", "member_history", "<member_id>", 1, 1, command_member_history,
+     "every confirmed record involving a member"},
+    {"Fraud and audit", "book_history", "<book_id>", 1, 1, command_book_history,
+     "every confirmed record for a title's copies"},
+    {"Fraud and audit", "tamper_demo", "[block]", 0, 1, command_tamper_demo,
+     "attack a copy of the chain and show what catches it"},
     {"Keys", "logout", "", 0, 0, command_logout, "lock every unlocked private key"},
 };
 

@@ -1,4 +1,5 @@
 #include "mining.h"
+#include "storage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,5 +143,6 @@ bool commit_block(LibrarySystem *library, const Block *block, LibraryState *work
     }
     save_pool(POOL_FILE, &library->pool);
     prune_pool(library);
+    save_snapshots(&library->state, &library->chain, library->difficulty);
     return true;
 }

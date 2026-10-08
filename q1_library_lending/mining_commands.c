@@ -1,5 +1,6 @@
 #include "commands.h"
 #include "mining.h"
+#include "storage.h"
 #include "utils.h"
 
 #include <limits.h>
@@ -411,6 +412,7 @@ bool command_set_difficulty(LibrarySystem *library, int arg_count, char *args[])
         return false;
     }
     library->difficulty = (int)difficulty;
+    save_snapshots(&library->state, &library->chain, library->difficulty);
     printf("Difficulty set to %d. New blocks need a hash starting with %d zero%s (about %lu attempts).\n",
            library->difficulty, library->difficulty, library->difficulty == 1 ? "" : "s",
            expected_attempts(library->difficulty));
