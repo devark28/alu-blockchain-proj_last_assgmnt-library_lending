@@ -84,12 +84,41 @@ int assemble_block(LibrarySystem *library, Block *block, LibraryState **working)
 }
 
 /*
+ * Fills the reward fields that go into the block hash: token_reward and
+ * transaction_id from the returns in the block, and the mining payouts,
+ * which together make up block_reward.
+ */
+void set_block_rewards(Block *block, const TxOutput *payouts, int payout_count)
+{
+    Transaction reward;
+    if (build_reward_transaction(block->records, block->record_count, block->index, &reward,
+                                 &block->token_reward)) {
+        memcpy(block->transaction_id, reward.txid, HASH_HEX_SIZE);
+    } else {
+        block->transaction_id[0] = '\0';
+    }
+
+    block->block_reward = 0;
+    block->payout_count = payout_count;
+    for (int i = 0; i < payout_count; i++) {
+        block->payouts[i] = payouts[i];
+        block->block_reward += payouts[i].amount;
+    }
+}
+
+/*
  * Called once the block's proof of work is found. The block is appended and
  * saved, the state that already includes its records replaces the old one,
  * and its requests leave the pool. Takes ownership of working.
  */
 bool commit_block(LibrarySystem *library, const Block *block, LibraryState *working)
 {
+    char problem[PROBLEM_SIZE];
+    if (!apply_block_transactions(working, block, problem)) {
+        printf("ERROR: block %d could not pay its rewards: %s\n", block->index, problem);
+        free_state(working);
+        return false;
+    }
     if (!block_list_append(&library->chain, block)) {
         free_state(working);
         return false;
@@ -102,6 +131,7 @@ bool commit_block(LibrarySystem *library, const Block *block, LibraryState *work
 
     free_state_contents(&library->state);
     library->state = *working;
+    library->state.current_block = library->chain.count;
     free(working);
 
     for (int r = 0; r < block->record_count; r++) {

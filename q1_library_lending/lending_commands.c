@@ -529,6 +529,9 @@ bool command_mine_solo(LibrarySystem *library, int arg_count, char *args[])
     LibraryState *working;
     while (assemble_block(library, &block, &working) > 0) {
         prepare_block(&block, &library->chain, library->difficulty, args[0]);
+        TxOutput payout = {.amount = BLOCK_REWARD};
+        copy_field(payout.owner, ID_SIZE, args[0]);
+        set_block_rewards(&block, &payout, 1);
         unsigned long attempts = 0;
         search_nonce(&block, ULONG_MAX, &attempts);
         if (!commit_block(library, &block, working)) {
@@ -537,6 +540,7 @@ bool command_mine_solo(LibrarySystem *library, int arg_count, char *args[])
         printf("Block %d mined by %s: %d record%s, difficulty %d, nonce %lu, %lu hash attempts\n  hash %s\n",
                block.index, args[0], block.record_count, block.record_count == 1 ? "" : "s", block.difficulty,
                block.nonce, attempts, block.hash);
+        ledger_print_state(&library->state.ledger, &library->state.identities);
         mined++;
     }
 

@@ -38,5 +38,13 @@ bool command_fraud_review(LibrarySystem *library, int arg_count, char *args[]);
 bool command_approve_suspicious(LibrarySystem *library, int arg_count, char *args[]);
 bool command_reject_suspicious(LibrarySystem *library, int arg_count, char *args[]);
 bool command_replay_request(LibrarySystem *library, int arg_count, char *args[]);
+bool command_token_transfer(LibrarySystem *library, int arg_count, char *args[]);
+bool command_token_balance(LibrarySystem *library, int arg_count, char *args[]);
+bool command_utxo_view(LibrarySystem *library, int arg_count, char *args[]);
+bool command_account_balance(LibrarySystem *library, int arg_count, char *args[]);
+bool command_account_transfer(LibrarySystem *library, int arg_count, char *args[]);
+bool command_transaction_history(LibrarySystem *library, int arg_count, char *args[]);
+bool command_settle_fine(LibrarySystem *library, int arg_count, char *args[]);
+bool command_double_spend_test(LibrarySystem *library, int arg_count, char *args[]);
 
 #endif

@@ -3,6 +3,7 @@
 
 #include "blockchain.h"
 #include "keyring.h"
+#include "ledger.h"
 #include "record.h"
 #include "registry.h"
 #include "reservation.h"
@@ -22,12 +23,16 @@
 
 /*
  * Everything that follows from the confirmed chain: copy states and fines
- * (inside registry), identities and nonces, and reservation queues.
+ * (inside registry), identities and nonces, reservation queues and token
+ * balances. current_block is the index of the block whose records are
+ * being applied, which the transaction history records.
  */
 typedef struct {
     Registry registry;
     Keyring identities;
     ReservationList reservations;
+    Ledger ledger;
+    int current_block;
 } LibraryState;
 
 LibraryState *clone_state(const LibraryState *state);
@@ -35,6 +40,7 @@ void free_state_contents(LibraryState *state);
 void free_state(LibraryState *state);
 
 bool apply_record(LibraryState *state, const Record *record, char problem[PROBLEM_SIZE]);
+bool apply_block_transactions(LibraryState *state, const Block *block, char problem[PROBLEM_SIZE]);
 bool replay_chain(LibraryState *state, const BlockList *chain);
 
 int compute_fine(time_t due_date, time_t at);

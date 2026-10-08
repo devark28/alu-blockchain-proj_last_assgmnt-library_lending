@@ -80,7 +80,7 @@ static void format_payouts(const Block *block, char buffer[PAYOUTS_TEXT_SIZE])
     size_t used = 0;
     for (int i = 0; i < block->payout_count; i++) {
         used += (size_t)snprintf(buffer + used, PAYOUTS_TEXT_SIZE - used, "%s%s:%d", i > 0 ? "," : "",
-                                 block->payouts[i].account_id, block->payouts[i].amount);
+                                 block->payouts[i].owner, block->payouts[i].amount);
     }
 }
 
@@ -100,7 +100,7 @@ static bool parse_payouts(char *text, Block *block)
         char *parts[2];
         long long amount;
         if (split_line(pairs[i], ':', parts, 2) != 2
-            || !copy_field(block->payouts[i].account_id, ID_SIZE, parts[0])
+            || !copy_field(block->payouts[i].owner, ID_SIZE, parts[0])
             || !parse_number(parts[1], 0, INT_MAX, &amount)) {
             return false;
         }
@@ -290,6 +290,29 @@ static int check_records(const Block *block, Keyring *identities, char problems[
     return failures;
 }
 
+/*
+ * The reward fields must match what the records earn: the block's
+ * token_reward and transaction_id are rebuilt from its returns, and the
+ * mining payouts must add up to exactly BLOCK_REWARD (none for genesis).
+ */
+static bool rewards_are_consistent(const Block *block)
+{
+    Transaction reward;
+    int token_reward;
+    bool has_reward = build_reward_transaction(block->records, block->record_count, block->index, &reward,
+                                               &token_reward);
+    bool reward_ok = has_reward ? block->token_reward == token_reward
+                                      && strcmp(block->transaction_id, reward.txid) == 0
+                                : block->token_reward == 0 && block->transaction_id[0] == '\0';
+
+    int paid = 0;
+    for (int i = 0; i < block->payout_count; i++) {
+        paid += block->payouts[i].amount;
+    }
+    int expected_reward = block->index == 0 ? 0 : BLOCK_REWARD;
+    return reward_ok && block->block_reward == expected_reward && paid == expected_reward;
+}
+
 static const char *result(bool passed)
 {
     return passed ? "OK  " : "FAIL";
@@ -324,15 +347,17 @@ bool validate_chain(const BlockList *chain, Keyring *identities, bool print_repo
                        && hash_meets_difficulty(recomputed_hash, block->difficulty);
         bool merkle_ok = root_computed && strcmp(recomputed_root, block->merkle_root) == 0
                          && !repeats_a_record(block);
+        bool reward_ok = rewards_are_consistent(block);
 
         char problems[RECORDS_PER_BLOCK][PROBLEM_SIZE];
         bool records_ok = root_computed && check_records(block, rebuilt, problems) == 0;
 
         if (print_report) {
-            bool all_ok = index_ok && time_ok && link_ok && hash_ok && work_ok && merkle_ok && records_ok;
-            printf("Block %-4d index %s time %s link %s hash %s pow %s merkle %s records %s%s\n", i,
+            bool all_ok = index_ok && time_ok && link_ok && hash_ok && work_ok && merkle_ok && reward_ok
+                          && records_ok;
+            printf("Block %-4d index %s time %s link %s hash %s pow %s merkle %s reward %s records %s%s\n", i,
                    result(index_ok), result(time_ok), result(link_ok), result(hash_ok), result(work_ok),
-                   result(merkle_ok), result(records_ok), all_ok ? "" : " <-- TAMPERED");
+                   result(merkle_ok), result(reward_ok), result(records_ok), all_ok ? "" : " <-- TAMPERED");
             for (int r = 0; root_computed && r < block->record_count; r++) {
                 if (problems[r][0] != '\0') {
                     printf("           record %d (%.12s...): %s\n", r, block->records[r].record_id, problems[r]);
@@ -340,7 +365,8 @@ bool validate_chain(const BlockList *chain, Keyring *identities, bool print_repo
             }
         }
 
-        bool block_valid = index_ok && time_ok && link_ok && hash_ok && work_ok && merkle_ok && records_ok;
+        bool block_valid = index_ok && time_ok && link_ok && hash_ok && work_ok && merkle_ok && reward_ok
+                           && records_ok;
         if (!block_valid && first_bad_block < 0) {
             first_bad_block = i;
         }
@@ -520,7 +546,7 @@ void print_block_details(const Block *block)
     printf("  transaction_id: %s\n", block->transaction_id[0] != '\0' ? block->transaction_id : "-");
     printf("  block_reward:   %d", block->block_reward);
     for (int i = 0; i < block->payout_count; i++) {
-        printf("%s %s %d", i == 0 ? ", paid to" : ",", block->payouts[i].account_id, block->payouts[i].amount);
+        printf("%s %s %d", i == 0 ? ", paid to" : ",", block->payouts[i].owner, block->payouts[i].amount);
     }
     printf("\n  records:\n");
     for (int i = 0; i < block->record_count; i++) {

@@ -4,6 +4,7 @@
 #include "crypto.h"
 #include "keyring.h"
 #include "record.h"
+#include "transaction.h"
 
 #include <stdbool.h>
 #include <time.h>
@@ -13,11 +14,6 @@
 #define DEFAULT_DIFFICULTY 2
 #define MIN_DIFFICULTY 1
 #define MAX_DIFFICULTY 4
-
-typedef struct {
-    char account_id[ID_SIZE];
-    int amount;
-} Payout;
 
 /*
  * The header fields are hashed together into hash. The records are covered
@@ -37,7 +33,7 @@ typedef struct {
     int difficulty;
     unsigned long nonce;
     int block_reward;
-    Payout payouts[MAX_PAYOUTS];
+    TxOutput payouts[MAX_PAYOUTS];
     int payout_count;
     Record records[RECORDS_PER_BLOCK];
 } Block;

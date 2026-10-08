@@ -51,9 +51,15 @@ LibraryState *clone_state(const LibraryState *state)
         return NULL;
     }
     copy->registry = state->registry;
+    copy->current_block = state->current_block;
     bool cloned = clone_keyring(&state->identities, &copy->identities);
     if (cloned && !clone_reservations(&state->reservations, &copy->reservations)) {
         keyring_free(&copy->identities);
+        cloned = false;
+    }
+    if (cloned && !ledger_clone(&state->ledger, &copy->ledger)) {
+        keyring_free(&copy->identities);
+        reservations_free(&copy->reservations);
         cloned = false;
     }
     if (!cloned) {
@@ -68,6 +74,7 @@ void free_state_contents(LibraryState *state)
 {
     keyring_free(&state->identities);
     reservations_free(&state->reservations);
+    ledger_free(&state->ledger);
 }
 
 void free_state(LibraryState *state)
@@ -333,6 +340,71 @@ static bool apply_registration(LibraryState *state, const Record *record, char p
     return true;
 }
 
+static bool is_valid_recipient(const LibraryState *state, const char *id)
+{
+    return find_member(&state->registry, id) != NULL || strcmp(id, CLOUD_PROVIDER_ACCOUNT) == 0;
+}
+
+/*
+ * A TRANSFER pays another member (or the cloud provider, for rented mining).
+ * A FINE_PAID settles the member's whole fine and goes to the library. Both
+ * cost the sender TRANSACTION_FEE on top and must be covered by the balance.
+ */
+static bool apply_payment(LibraryState *state, const Record *record, char problem[PROBLEM_SIZE])
+{
+    if (!check_member(state, record, problem)) {
+        return false;
+    }
+    if (record->amount <= 0) {
+        return fail(problem, "amount must be positive, not %d", record->amount);
+    }
+
+    Member *member = find_member(&state->registry, record->member_id);
+    if (record->action == ACTION_FINE_PAID) {
+        if (strcmp(record->recipient_id, LIBRARY_ACCOUNT) != 0) {
+            return fail(problem, "fines are paid to %s", LIBRARY_ACCOUNT);
+        }
+        if (record->amount != member->fines_owed) {
+            return fail(problem, "%s owes %d in fines, not %d", member->member_id, member->fines_owed,
+                        record->amount);
+        }
+    } else if (!is_valid_recipient(state, record->recipient_id)) {
+        return fail(problem, "recipient %s is not a registered member", record->recipient_id);
+    }
+
+    Transaction tx;
+    build_payment_transaction(record, state->current_block, &tx);
+    if (!ledger_apply(&state->ledger, &tx, problem)) {
+        return false;
+    }
+    if (record->action == ACTION_FINE_PAID) {
+        member->fines_owed -= record->amount;
+    }
+    return true;
+}
+
+/*
+ * After a block's records, its reward transaction pays the members who
+ * returned books in it, and its mining transaction pays the miners. Neither
+ * needs a signature: both are rebuilt from the block, which validation checks.
+ */
+bool apply_block_transactions(LibraryState *state, const Block *block, char problem[PROBLEM_SIZE])
+{
+    Transaction tx;
+    int token_reward;
+    if (build_reward_transaction(block->records, block->record_count, block->index, &tx, &token_reward)
+        && !ledger_apply(&state->ledger, &tx, problem)) {
+        return false;
+    }
+    if (block->payout_count > 0) {
+        build_mining_transaction(block->payouts, block->payout_count, block->index, &tx);
+        if (!ledger_apply(&state->ledger, &tx, problem)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool apply_action(LibraryState *state, const Record *record, char problem[PROBLEM_SIZE])
 {
     switch (record->action) {
@@ -352,7 +424,7 @@ static bool apply_action(LibraryState *state, const Record *record, char problem
         return apply_registration(state, record, problem);
     case ACTION_TRANSFER:
     case ACTION_FINE_PAID:
-        return fail(problem, "%s records are not supported yet", action_name(record->action));
+        return apply_payment(state, record, problem);
     }
     return false;
 }
@@ -398,18 +470,24 @@ bool apply_record(LibraryState *state, const Record *record, char problem[PROBLE
     return true;
 }
 
-/* Rebuilds the state by applying every confirmed record in chain order. */
+/* Rebuilds the state by applying every confirmed record and block transaction in chain order. */
 bool replay_chain(LibraryState *state, const BlockList *chain)
 {
+    char problem[PROBLEM_SIZE];
     for (int b = 0; b < chain->count; b++) {
         const Block *block = &chain->blocks[b];
+        state->current_block = b;
         for (int r = 0; r < block->record_count; r++) {
-            char problem[PROBLEM_SIZE];
             if (!apply_record(state, &block->records[r], problem)) {
                 printf("ERROR: block %d record %d breaks the lending rules: %s\n", b, r, problem);
                 return false;
             }
         }
+        if (!apply_block_transactions(state, block, problem)) {
+            printf("ERROR: block %d pays out tokens that do not add up: %s\n", b, problem);
+            return false;
+        }
     }
+    state->current_block = chain->count;
     return true;
 }

@@ -59,6 +59,7 @@ static bool create_genesis_block(LibrarySystem *library)
 
     char problem[PROBLEM_SIZE];
     if (created && apply_record(&library->state, registration, problem)) {
+        library->state.current_block = library->chain.count;
         return keep_unlocked_key(&library->keys, LIBRARIAN_ID, librarian_key);
     }
     EVP_PKEY_free(librarian_key);
@@ -106,15 +107,17 @@ static bool load_and_validate_chain(LibrarySystem *library)
     return true;
 }
 
-bool library_open(LibrarySystem *library)
+bool library_open(LibrarySystem *library, LedgerModel model, int difficulty)
 {
-    library->difficulty = DEFAULT_DIFFICULTY;
+    library->difficulty = difficulty;
+    library->state.ledger.model = model;
 
     if (!load_registry(&library->state.registry, BOOKS_FILE, MEMBERS_FILE, COPIES_FILE)) {
         return false;
     }
     printf("Loaded %d books, %d copies and %d members.\n", library->state.registry.book_count,
            library->state.registry.copy_count, library->state.registry.member_count);
+    printf("Ledger model: %s. Mining difficulty: %d.\n", model_name(model), difficulty);
 
     bool opened;
     if (access(CHAIN_FILE, F_OK) == 0) {
@@ -280,12 +283,18 @@ static bool add_to_pool(LibrarySystem *library, const PendingRequest *request)
     return true;
 }
 
+bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_key)
+{
+    return submit_request_with_nonce(library, record, signing_key, AUTOMATIC_NONCE);
+}
+
 /*
  * Checks a new request against the chain plus everything already pending,
- * gives it the signer's next nonce, signs it, runs the misuse checks and
- * adds it to the pool. The caller fills in the action, IDs and timestamp.
+ * signs it with the signer's next nonce (or with nonce, when the caller
+ * supplies one to test replay protection), runs the misuse checks and adds
+ * it to the pool. The caller fills in the action, IDs and timestamp.
  */
-bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_key)
+bool submit_request_with_nonce(LibrarySystem *library, Record *record, EVP_PKEY *signing_key, int nonce)
 {
     LibraryState *effective = build_effective_state(library);
     if (effective == NULL) {
@@ -298,7 +307,7 @@ bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_ke
         free_state(effective);
         return false;
     }
-    record->nonce = signer->next_nonce;
+    record->nonce = nonce == AUTOMATIC_NONCE ? signer->next_nonce : nonce;
     if (!sign_record(record, signing_key)) {
         free_state(effective);
         return false;
@@ -315,7 +324,7 @@ bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_ke
     bool accepted = apply_record(effective, record, problem);
     free_state(effective);
     if (!accepted) {
-        printf("ERROR: %s\n", problem);
+        printf("REJECTED: %s\n", problem);
         return false;
     }
     return add_to_pool(library, &request);
