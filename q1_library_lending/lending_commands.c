@@ -1,11 +1,8 @@
 #include "commands.h"
 #include "inventory.h"
-#include "mining.h"
 #include "utils.h"
 
-#include <limits.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static void start_record(Record *record, RecordAction action, const char *signer_id)
@@ -515,37 +512,4 @@ bool command_pool_view(LibrarySystem *library, int arg_count, char *args[])
     (void)args;
     print_pool(&library->pool);
     return true;
-}
-
-bool command_mine_solo(LibrarySystem *library, int arg_count, char *args[])
-{
-    (void)arg_count;
-    if (require_member(&library->state.registry, args[0]) == NULL || !require_writable_chain(library)) {
-        return false;
-    }
-
-    int mined = 0;
-    Block block;
-    LibraryState *working;
-    while (assemble_block(library, &block, &working) > 0) {
-        prepare_block(&block, &library->chain, library->difficulty, args[0]);
-        TxOutput payout = {.amount = BLOCK_REWARD};
-        copy_field(payout.owner, ID_SIZE, args[0]);
-        set_block_rewards(&block, &payout, 1);
-        unsigned long attempts = 0;
-        search_nonce(&block, ULONG_MAX, &attempts);
-        if (!commit_block(library, &block, working)) {
-            return false;
-        }
-        printf("Block %d mined by %s: %d record%s, difficulty %d, nonce %lu, %lu hash attempts\n  hash %s\n",
-               block.index, args[0], block.record_count, block.record_count == 1 ? "" : "s", block.difficulty,
-               block.nonce, attempts, block.hash);
-        ledger_print_state(&library->state.ledger, &library->state.identities);
-        mined++;
-    }
-
-    if (mined == 0) {
-        printf("Nothing to mine: no pending request can be confirmed right now.\n");
-    }
-    return mined > 0;
 }

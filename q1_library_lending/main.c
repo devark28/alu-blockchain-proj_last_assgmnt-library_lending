@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static LibrarySystem library;
 
@@ -56,6 +57,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    srand((unsigned int)time(NULL));
     watch_for_interrupt();
     if (!library_open(&library, model, difficulty)) {
         library_close(&library);

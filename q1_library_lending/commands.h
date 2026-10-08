@@ -46,5 +46,9 @@ bool command_account_transfer(LibrarySystem *library, int arg_count, char *args[
 bool command_transaction_history(LibrarySystem *library, int arg_count, char *args[]);
 bool command_settle_fine(LibrarySystem *library, int arg_count, char *args[]);
 bool command_double_spend_test(LibrarySystem *library, int arg_count, char *args[]);
+bool command_mine_pool(LibrarySystem *library, int arg_count, char *args[]);
+bool command_mine_cloud(LibrarySystem *library, int arg_count, char *args[]);
+bool command_difficulty_status(LibrarySystem *library, int arg_count, char *args[]);
+bool command_set_difficulty(LibrarySystem *library, int arg_count, char *args[]);
 
 #endif
