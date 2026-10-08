@@ -1,4 +1,5 @@
 #include "library.h"
+#include "fraud.h"
 #include "utils.h"
 
 #include <limits.h>
@@ -263,10 +264,26 @@ static void set_priority(const LibraryState *effective, PendingRequest *request)
     }
 }
 
+static bool add_to_pool(LibrarySystem *library, const PendingRequest *request)
+{
+    if (!pool_add(&library->pool, request) || !save_pool(POOL_FILE, &library->pool)) {
+        return false;
+    }
+    const Record *record = &request->record;
+    printf("Request %.12s added to the pending pool: %s signed by %s with nonce %d.\n", record->record_id,
+           action_name(record->action), record->signer_id, record->nonce);
+    if (request->status == REQUEST_SUSPICIOUS) {
+        printf("FLAGGED SUSPICIOUS: %s\n", request->flag_reason);
+        printf("It stays in the pool and will not be mined until a librarian runs approve_suspicious or "
+               "reject_suspicious.\n");
+    }
+    return true;
+}
+
 /*
  * Checks a new request against the chain plus everything already pending,
- * gives it the signer's next nonce, signs it and adds it to the pool. The
- * caller fills in the action, IDs and timestamp.
+ * gives it the signer's next nonce, signs it, runs the misuse checks and
+ * adds it to the pool. The caller fills in the action, IDs and timestamp.
  */
 bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_key)
 {
@@ -282,12 +299,17 @@ bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_ke
         return false;
     }
     record->nonce = signer->next_nonce;
+    if (!sign_record(record, signing_key)) {
+        free_state(effective);
+        return false;
+    }
 
     PendingRequest request;
     memset(&request, 0, sizeof(request));
     request.record = *record;
-    request.status = REQUEST_PENDING;
     set_priority(effective, &request);
+    bool suspicious = detect_misuse(library, effective, record, request.flag_reason);
+    request.status = suspicious ? REQUEST_SUSPICIOUS : REQUEST_PENDING;
 
     char problem[PROBLEM_SIZE];
     bool accepted = apply_record(effective, record, problem);
@@ -296,27 +318,29 @@ bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_ke
         printf("ERROR: %s\n", problem);
         return false;
     }
-    if (!sign_record(record, signing_key)) {
-        return false;
-    }
-    request.record = *record;
-
-    if (!pool_add(&library->pool, &request) || !save_pool(POOL_FILE, &library->pool)) {
-        return false;
-    }
-    printf("Request %.12s added to the pending pool: %s signed by %s with nonce %d.\n", record->record_id,
-           action_name(record->action), record->signer_id, record->nonce);
-    return true;
+    return add_to_pool(library, &request);
 }
 
-static bool signer_already_dropped(char dropped[][ID_SIZE], int dropped_count, const char *signer_id)
+/*
+ * Puts an already signed record into the pool again unchanged, the way an
+ * attacker would replay a captured request. It is not re-signed and gets no
+ * new nonce, so the duplicate check always flags it.
+ */
+bool resubmit_signed_record(LibrarySystem *library, const Record *record)
 {
-    for (int i = 0; i < dropped_count; i++) {
-        if (strcmp(dropped[i], signer_id) == 0) {
-            return true;
-        }
+    LibraryState *effective = build_effective_state(library);
+    if (effective == NULL) {
+        return false;
     }
-    return false;
+
+    PendingRequest request;
+    memset(&request, 0, sizeof(request));
+    request.record = *record;
+    set_priority(effective, &request);
+    bool suspicious = detect_misuse(library, effective, record, request.flag_reason);
+    request.status = suspicious ? REQUEST_SUSPICIOUS : REQUEST_PENDING;
+    free_state(effective);
+    return add_to_pool(library, &request);
 }
 
 static bool request_is_still_valid(LibraryState *working, const Record *record, char problem[PROBLEM_SIZE])
@@ -337,9 +361,11 @@ static bool request_is_still_valid(LibraryState *working, const Record *record, 
 
 /*
  * Replays the pool in submission order on top of the confirmed state and
- * drops every request that no longer holds. When a request is dropped, the
- * same signer's later requests carry nonces that can never be confirmed (a
- * nonce gap), so they fail too and are reported as needing resubmission.
+ * drops every request that no longer holds. When a request is dropped or
+ * rejected, the same signer's later requests skip its nonce and can never
+ * be confirmed (a nonce gap), so they are dropped too and need resubmitting.
+ * SUSPICIOUS requests are kept for the librarian to review. Approving one
+ * brings it back under these checks, so an approved replay is still dropped.
  */
 void prune_pool(LibrarySystem *library)
 {
@@ -348,29 +374,28 @@ void prune_pool(LibrarySystem *library)
         return;
     }
 
-    char dropped_signers[MAX_MEMBERS + 1][ID_SIZE];
-    int dropped_count = 0;
     bool changed = false;
     int index = 0;
-
     while (index < library->pool.count) {
-        const Record *record = &library->pool.items[index].record;
+        const PendingRequest *request = &library->pool.items[index];
+        const Record *record = &request->record;
         char problem[PROBLEM_SIZE];
+        if (request->status == REQUEST_SUSPICIOUS) {
+            apply_record(working, record, problem);
+            index++;
+            continue;
+        }
         if (request_is_still_valid(working, record, problem)) {
             index++;
             continue;
         }
 
-        if (signer_already_dropped(dropped_signers, dropped_count, record->signer_id)) {
-            printf("Dropped request %.12s (%s by %s): it follows a dropped request from the same signer, "
-                   "so nonce %d can never be confirmed. Submit it again.\n",
-                   record->record_id, action_name(record->action), record->signer_id, record->nonce);
-        } else {
-            printf("Dropped request %.12s (%s by %s): %s\n", record->record_id, action_name(record->action),
-                   record->signer_id, problem);
-            if (dropped_count <= MAX_MEMBERS) {
-                copy_field(dropped_signers[dropped_count++], ID_SIZE, record->signer_id);
-            }
+        const Identity *signer = find_identity(&working->identities, record->signer_id);
+        printf("Dropped request %.12s (%s by %s): %s\n", record->record_id, action_name(record->action),
+               record->signer_id, problem);
+        if (signer != NULL && record->nonce > signer->next_nonce) {
+            printf("  An earlier request from %s was rejected or dropped, leaving a nonce gap. Submit this one again.\n",
+                   record->signer_id);
         }
         pool_remove(&library->pool, index);
         changed = true;

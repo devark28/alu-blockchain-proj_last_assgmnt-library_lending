@@ -105,7 +105,7 @@ bool commit_block(LibrarySystem *library, const Block *block, LibraryState *work
     free(working);
 
     for (int r = 0; r < block->record_count; r++) {
-        int index = find_request(&library->pool, block->records[r].record_id);
+        int index = find_request(&library->pool, block->records[r].record_id, false);
         if (index >= 0) {
             pool_remove(&library->pool, index);
         }

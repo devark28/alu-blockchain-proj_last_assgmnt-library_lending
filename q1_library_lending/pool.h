@@ -8,7 +8,7 @@
 
 #define PRIORITY_OVERDUE 0
 #define PRIORITY_NORMAL 1
-#define FLAG_REASON_SIZE 96
+#define FLAG_REASON_SIZE 200
 #define MIN_ID_PREFIX 6
 
 typedef enum {
@@ -40,7 +40,7 @@ typedef struct {
 
 bool pool_add(Pool *pool, const PendingRequest *request);
 void pool_remove(Pool *pool, int index);
-int find_request(const Pool *pool, const char *id_or_prefix);
+int find_request(const Pool *pool, const char *id_or_prefix, bool suspicious);
 void sort_pool_order(const Pool *pool, int order[]);
 void pool_free(Pool *pool);
 

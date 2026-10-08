@@ -381,9 +381,13 @@ bool apply_record(LibraryState *state, const Record *record, char problem[PROBLE
         if (signer == NULL) {
             return fail(problem, "%s has no registered public key", record->signer_id);
         }
-        if (record->nonce != signer->next_nonce) {
-            return fail(problem, "nonce %d from %s, expected %d", record->nonce, record->signer_id,
-                     signer->next_nonce);
+        if (record->nonce < signer->next_nonce) {
+            return fail(problem, "nonce %d from %s was already used, the next is %d", record->nonce,
+                        record->signer_id, signer->next_nonce);
+        }
+        if (record->nonce > signer->next_nonce) {
+            return fail(problem, "nonce %d from %s skips nonce %d, which was never confirmed", record->nonce,
+                        record->signer_id, signer->next_nonce);
         }
     }
 

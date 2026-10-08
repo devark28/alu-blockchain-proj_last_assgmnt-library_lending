@@ -37,6 +37,7 @@ EVP_PKEY *unlock_member(LibrarySystem *library, const char *member_id);
 
 LibraryState *build_effective_state(const LibrarySystem *library);
 bool submit_request(LibrarySystem *library, Record *record, EVP_PKEY *signing_key);
+bool resubmit_signed_record(LibrarySystem *library, const Record *record);
 void prune_pool(LibrarySystem *library);
 
 #endif

@@ -53,10 +53,13 @@ void pool_remove(Pool *pool, int index)
 
 /*
  * Accepts a full request ID or a unique prefix of at least MIN_ID_PREFIX
- * characters, as shown by pool_view. Returns -1 when nothing or more than
- * one request matches.
+ * characters, as shown by pool_view, among requests that are (or are not)
+ * flagged SUSPICIOUS. A replayed request has the same ID as its original,
+ * so the flag is what tells the two apart. When every match has the very
+ * same ID (an original and its replay, both flagged), the newest is chosen.
+ * Returns -1 when nothing matches or the prefix fits different requests.
  */
-int find_request(const Pool *pool, const char *id_or_prefix)
+int find_request(const Pool *pool, const char *id_or_prefix, bool suspicious)
 {
     size_t length = strlen(id_or_prefix);
     int match = -1;
@@ -64,12 +67,15 @@ int find_request(const Pool *pool, const char *id_or_prefix)
         return -1;
     }
     for (int i = 0; i < pool->count; i++) {
-        if (strncmp(pool->items[i].record.record_id, id_or_prefix, length) == 0) {
-            if (match >= 0) {
-                return -1;
-            }
-            match = i;
+        const PendingRequest *request = &pool->items[i];
+        if ((request->status == REQUEST_SUSPICIOUS) != suspicious
+            || strncmp(request->record.record_id, id_or_prefix, length) != 0) {
+            continue;
         }
+        if (match >= 0 && strcmp(pool->items[match].record.record_id, request->record.record_id) != 0) {
+            return -1;
+        }
+        match = i;
     }
     return match;
 }

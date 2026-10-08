@@ -154,8 +154,8 @@ bool command_borrow_book(LibrarySystem *library, int arg_count, char *args[])
     if (!submit_request(library, &record, member_key)) {
         return false;
     }
-    printf("%s borrows copy %s of %s once the block is mined.\n", member->member_id, copy_id, book->title);
-    print_due_date("Due:", record.due_date);
+    printf("Copy %s of %s, for %s.\n", copy_id, book->title, member->member_id);
+    print_due_date("Due date once confirmed:", record.due_date);
     return true;
 }
 
@@ -276,7 +276,7 @@ bool command_reserve_book(LibrarySystem *library, int arg_count, char *args[])
         return false;
     }
     const ReservationQueue *queue = find_queue(&library->state.reservations, book->book_id);
-    printf("%s joins the queue for %s at position %d once the block is mined.\n", member->member_id, book->title,
+    printf("%s joins the queue for %s at position %d once the request is confirmed.\n", member->member_id, book->title,
            (queue != NULL ? queue->length : 0) + 1);
     return true;
 }

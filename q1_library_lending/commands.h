@@ -34,5 +34,9 @@ bool command_check_overdue(LibrarySystem *library, int arg_count, char *args[]);
 bool command_view_fines(LibrarySystem *library, int arg_count, char *args[]);
 bool command_pool_view(LibrarySystem *library, int arg_count, char *args[]);
 bool command_mine_solo(LibrarySystem *library, int arg_count, char *args[]);
+bool command_fraud_review(LibrarySystem *library, int arg_count, char *args[]);
+bool command_approve_suspicious(LibrarySystem *library, int arg_count, char *args[]);
+bool command_reject_suspicious(LibrarySystem *library, int arg_count, char *args[]);
+bool command_replay_request(LibrarySystem *library, int arg_count, char *args[]);
 
 #endif

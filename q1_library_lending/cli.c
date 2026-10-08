@@ -49,6 +49,13 @@ static const Command COMMANDS[] = {
     {"Blockchain and mining", "mine_solo", "<miner_id>", 1, 1, command_mine_solo, "mine every pending request"},
     {"Blockchain and mining", "chain_view", "[index]", 0, 1, command_chain_view, "list blocks, or show one block in full"},
     {"Blockchain and mining", "validate_chain", "", 0, 0, command_validate_chain, "check every block and record"},
+    {"Fraud and audit", "fraud_review", "", 0, 0, command_fraud_review, "requests held as SUSPICIOUS and why"},
+    {"Fraud and audit", "approve_suspicious", "<id>", 1, 1, command_approve_suspicious,
+     "librarian: release a flagged request for mining"},
+    {"Fraud and audit", "reject_suspicious", "<id>", 1, 1, command_reject_suspicious,
+     "librarian: discard a flagged request"},
+    {"Fraud and audit", "replay_request", "<id>", 1, 1, command_replay_request,
+     "test: submit a copy of an already signed request"},
     {"Keys", "logout", "", 0, 0, command_logout, "lock every unlocked private key"},
 };
 
