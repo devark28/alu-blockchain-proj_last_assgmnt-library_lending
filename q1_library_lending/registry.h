@@ -12,6 +12,7 @@
 #define AUTHOR_SIZE 50
 #define NAME_SIZE 50
 #define COURSE_SIZE 10
+#define LIBRARIAN_ID "LIBRARIAN"
 
 typedef enum {
     CONDITION_NEW,

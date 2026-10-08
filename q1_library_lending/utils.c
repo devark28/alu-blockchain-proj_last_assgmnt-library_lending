@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*
@@ -110,4 +111,17 @@ void format_time(time_t timestamp, char buffer[TIME_TEXT_SIZE])
         return;
     }
     strftime(buffer, TIME_TEXT_SIZE, "%Y-%m-%d %H:%M:%S", localtime(&timestamp));
+}
+
+/* Accepts only a complete base 10 number within [min, max]. */
+bool parse_number(const char *text, long long min, long long max, long long *value)
+{
+    char *end;
+    errno = 0;
+    long long number = strtoll(text, &end, 10);
+    if (text[0] == '\0' || *end != '\0' || errno != 0 || number < min || number > max) {
+        return false;
+    }
+    *value = number;
+    return true;
 }

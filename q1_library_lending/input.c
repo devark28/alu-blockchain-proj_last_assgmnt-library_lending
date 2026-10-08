@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <termios.h>
+#include <unistd.h>
 
 static volatile sig_atomic_t interrupted = 0;
 
@@ -49,4 +51,30 @@ bool read_line(char *buffer, size_t size)
     buffer[length] = '\0';
     trim_whitespace(buffer);
     return true;
+}
+
+/*
+ * Terminal echo is turned off while the passphrase is typed. It is always
+ * turned back on, including when Ctrl-C interrupts the read.
+ */
+bool prompt_passphrase(const char *label, char *buffer, size_t size)
+{
+    struct termios original_settings;
+    bool is_terminal = tcgetattr(STDIN_FILENO, &original_settings) == 0;
+
+    if (is_terminal) {
+        struct termios hidden_settings = original_settings;
+        hidden_settings.c_lflag &= ~(tcflag_t)ECHO;
+        tcsetattr(STDIN_FILENO, TCSANOW, &hidden_settings);
+    }
+
+    printf("%s", label);
+    fflush(stdout);
+    bool read_ok = read_line(buffer, size);
+
+    if (is_terminal) {
+        tcsetattr(STDIN_FILENO, TCSANOW, &original_settings);
+        printf("\n");
+    }
+    return read_ok;
 }

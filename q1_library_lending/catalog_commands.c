@@ -100,6 +100,9 @@ bool command_register_book(LibrarySystem *library, int arg_count, char *args[])
         printf("ERROR: title is limited to %d characters and author to %d\n", TITLE_SIZE - 1, AUTHOR_SIZE - 1);
         return false;
     }
+    if (!require_librarian(library)) {
+        return false;
+    }
 
     if (!add_book(registry, BOOKS_FILE, &book)) {
         return false;
@@ -152,6 +155,9 @@ bool command_add_copy(LibrarySystem *library, int arg_count, char *args[])
     CopyCondition condition;
     if (!parse_condition(args[1], &condition) || condition == CONDITION_LOST) {
         printf("ERROR: condition must be NEW, GOOD or WORN\n");
+        return false;
+    }
+    if (!require_librarian(library)) {
         return false;
     }
 

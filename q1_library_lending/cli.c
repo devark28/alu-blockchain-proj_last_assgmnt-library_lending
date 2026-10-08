@@ -30,6 +30,9 @@ static const Command COMMANDS[] = {
     {"Books and copies", "add_copy", "<book_id> <NEW|GOOD|WORN>", 2, 2, command_add_copy,
      "add a physical copy to copies.txt"},
     {"Books and copies", "view_copy", "<copy_id>", 1, 1, command_view_copy, "show one copy's state"},
+    {"Blockchain", "chain_view", "[index]", 0, 1, command_chain_view, "list blocks, or show one block in full"},
+    {"Blockchain", "validate_chain", "", 0, 0, command_validate_chain, "check every block and record"},
+    {"Keys", "logout", "", 0, 0, command_logout, "lock every unlocked private key"},
 };
 
 static const int COMMAND_COUNT = (int)(sizeof(COMMANDS) / sizeof(COMMANDS[0]));
