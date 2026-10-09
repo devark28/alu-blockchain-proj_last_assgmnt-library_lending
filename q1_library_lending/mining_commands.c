@@ -252,8 +252,8 @@ bool command_mine_pool(LibrarySystem *library, int arg_count, char *args[])
     for (int i = 0; i < POOL_MINER_COUNT; i++) {
         totals[i] = miners[i].total_reward;
     }
-    printf("\nPool session: %d block%s, %d coins to %s in pool fees\n", blocks_mined, blocks_mined == 1 ? "" : "s",
-           blocks_mined * pool_fee, POOL_OPERATOR_ACCOUNT);
+    printf("\nPool session: %d block%s, pool fees to %s: %d\n", blocks_mined, blocks_mined == 1 ? "" : "s",
+           POOL_OPERATOR_ACCOUNT, blocks_mined * pool_fee);
     print_pool_table(miners, totals, true);
     ledger_print_state(&library->state.ledger, &library->state.identities);
     return blocks_mined > 0;

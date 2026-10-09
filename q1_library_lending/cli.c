@@ -120,11 +120,11 @@ static void print_help(void)
         }
         char signature[96];
         snprintf(signature, sizeof(signature), "%s %s", command->name, command->arguments);
-        printf("  %-52s %s\n", signature, command->summary);
+        printf("  %-56s %s\n", signature, command->summary);
     }
     printf("\nShell\n");
-    printf("  %-52s %s\n", "help", "show this list");
-    printf("  %-52s %s\n", "exit", "leave the shell");
+    printf("  %-56s %s\n", "help", "show this list");
+    printf("  %-56s %s\n", "exit", "leave the shell");
     printf("\nWrap values that contain spaces in double quotes.\n");
 }
 
