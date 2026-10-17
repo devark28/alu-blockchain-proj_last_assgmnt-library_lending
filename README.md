@@ -9,6 +9,8 @@ This is the complete version of the tracker. It combines and extends two earlier
 
 A detailed explanation of the design, with real output from the program, is in [q1_library_lending/README.md](q1_library_lending/README.md).
 
+Demo video: [https://youtu.be/qSCJqbQES_I](https://youtu.be/qSCJqbQES_I)
+
 ## What this version adds
 
 | Area | Formative 2 | Now |
@@ -30,6 +32,7 @@ A detailed explanation of the design, with real output from the program, is in [
 - Linux (tested on Ubuntu 24.04)
 - `gcc` (tested with 13.3)
 - OpenSSL 3.0 or newer with development headers (tested with 3.0.13)
+- `make`, for the Makefile (comes with `build-essential`; the `gcc` command below works without it)
 
 ```
 sudo apt install build-essential libssl-dev
@@ -39,17 +42,28 @@ No other libraries are used. SHA-256 and ECDSA come from OpenSSL's libcrypto; th
 
 ## Build
 
-From `q1_library_lending/`:
+From `q1_library_lending/`, with the Makefile:
+
+```
+make            build library_tracker
+make test       build it with 10-second days (see below)
+make clean      delete the program
+make reset      delete the saved chain, pool, snapshots and keys, to start over
+```
+
+`make` runs exactly this `gcc` command, which also works on its own:
 
 ```
 gcc -Wall -Wextra -o library_tracker *.c -lcrypto
 ```
 
-It compiles with no warnings. A loan lasts 14 days, so to see overdue loans, fines and late returns without waiting, build a test version where one "day" lasts 10 seconds:
+It compiles with no warnings. A loan lasts 14 days, so to see overdue loans, fines and late returns without waiting, `make test` builds a version where one "day" lasts 10 seconds:
 
 ```
 gcc -Wall -Wextra -DDAY_SECONDS=10 -o library_tracker *.c -lcrypto
 ```
+
+Both `make` and `make test` always recompile, so switching between them never leaves the wrong build in place.
 
 `DAY_SECONDS` sets the length of a day everywhere a day is used: the 14-day loan, the 7-day renewal, fines (2 coins per started day late) and the one-day window of the re-borrow check. A chain made with one build should be used with the same build.
 
@@ -182,7 +196,7 @@ To see an unprofitable rental, raise the difficulty first: at difficulty 4 a rou
 | `meta.dat` | difficulty, block reward, model, chain height and the hash of the last block |
 | `keys/` | one key pair per identity; private keys are encrypted with AES-256 and readable only by the owner |
 
-The `.dat` files and `keys/` are created by the program. To start over, delete them: `rm -rf *.dat keys/`.
+The `.dat` files and `keys/` are created by the program. To start over, delete them with `make reset` (or `rm -rf *.dat keys/`).
 
 ## Screenshots
 
